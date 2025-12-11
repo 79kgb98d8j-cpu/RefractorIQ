@@ -21,6 +21,43 @@ services:
       - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
 
+  backend:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://refractor:mysecretpassword@postgres:5432/refractor_db
+      - REDIS_URL=redis://redis:6379/0
+      - PORT=8000
+    depends_on:
+      - postgres
+      - redis
+    restart: unless-stopped
+    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000
+
+  celery_worker:
+    build: .
+    environment:
+      - DATABASE_URL=postgresql://refractor:mysecretpassword@postgres:5432/refractor_db
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - postgres
+      - redis
+    restart: unless-stopped
+    command: celery -A backend.celery_app worker --loglevel=info
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    depends_on:
+      - backend
+    restart: unless-stopped
+
 volumes:
   redis_data:
   postgres_data:
